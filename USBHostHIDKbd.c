@@ -20,9 +20,10 @@ void firmware();
 /* FTDI:ETP */
 
 /* FTDI:SDH Driver Handles */
-VOS_HANDLE hUSBHOST_2; // USB Host Port 2
-VOS_HANDLE hUART; // UART Interface Driver
-VOS_HANDLE hUSBHOST_HID; // Connects to a HIDdevice on the USB Host Interface
+VOS_HANDLE hUSBHOST; 		// USB Host Port
+VOS_HANDLE hUART; 			// UART Interface Driver
+VOS_HANDLE hUSBHOST_HID; 	// Connects to a HIDdevice on the USB Host Interface
+VOS_HANDLE hGPIO_PORT_A; 	// GPIO Port A Driver
 /* FTDI:EDH */
 
 /* Declaration for IOMUx setup function */
@@ -32,6 +33,42 @@ void iomux_setup(void);
 char buf[64];
 char *eol = "\r\n";
 
+#define	GPIO_LED_STATUS		GPIO_A_1
+#define GPIO_LED_ACTIVITY	GPIO_A_2
+
+void blink()
+{
+		vos_gpio_write_pin(GPIO_LED_STATUS, 1);
+		vos_gpio_write_pin(GPIO_LED_ACTIVITY, 1);
+	
+		vos_delay_msecs(500);
+	
+		vos_gpio_write_pin(GPIO_LED_STATUS, 0);
+		vos_gpio_write_pin(GPIO_LED_ACTIVITY, 0);
+	
+		vos_delay_msecs(500);
+}
+
+
+void blink_status(uint16 repeats,uint16 duration)
+{
+		uint16 i;
+		for (i=0;i<repeats;i++) {
+			vos_gpio_write_pin(GPIO_LED_STATUS, 1);
+		
+			vos_delay_msecs(duration);
+		
+			vos_gpio_write_pin(GPIO_LED_STATUS, 0);
+
+			vos_delay_msecs(duration);
+		}
+		vos_delay_msecs(500);
+}
+		
+void number(unsigned char val) {
+	blink_status((uint16)val+1,100);
+}
+	
 /*
 ** message
 **
@@ -43,39 +80,21 @@ char *eol = "\r\n";
 */
 void message(char *str)
 {
-
+	return; //Disabled for release, wonder if there is a #define we could use
+	/*
 	int length = 0;
 	char *tmp = str;
 
 	while ((tmp[length] != '\0') && (length < MAX_STRING_LEN))
-		length++;                           /*calculate string length*/
+		length++;                           //calculate string length
 
 	vos_dev_write(hUART, (uint8 *) str, (uint16) length, NULL);
+	*/
 }
 
-/*
-** number
-**
-** Print a character in the terminal application.
-**
-** Parameters:	val - Byte to be printed
-** Returns:	void
-** Comments:
-*/
-void number(unsigned char val)
-{
-	unsigned char nibble;
 
-	nibble = (val >> 4) + '0';
-	if (nibble > '9') nibble += ('A' - '9' - 1);
 
-	vos_dev_write(hUART, &nibble, (uint16) 1, NULL);
 
-	nibble = (val & 15) + '0';
-	if (nibble > '9') nibble += ('A' - '9' - 1);
-
-	vos_dev_write(hUART, &nibble, (uint16) 1, NULL);
-}
 
 /* Main code - entry point to firmware */
 void main(void)
@@ -85,6 +104,8 @@ void main(void)
 	uart_context_t uartContext;
 	// USB Host configuration context
 	usbhost_context_t usbhostContext;
+	// GPIO Port A configuration context
+	gpio_context_t gpioContextA;
 	/* FTDI:EDD */
 
 	/* FTDI:SKI Kernel Initialisation */
@@ -95,6 +116,13 @@ void main(void)
 
 	iomux_setup();
 
+	// Initialise GPIO A
+	gpioContextA.port_identifier = GPIO_PORT_A;
+	gpio_init(VOS_DEV_GPIO_PORT_A,&gpioContextA);
+	
+	vos_gpio_set_pin_mode(GPIO_A_1,GPIO_MODE_OUTPUT);
+	vos_gpio_set_pin_mode(GPIO_A_2,GPIO_MODE_OUTPUT);
+	
 	/* FTDI:SDI Driver Initialisation */
 	// Initialise UART
 	uartContext.buffer_size = VOS_BUFFER_SIZE_128_BYTES;
@@ -108,7 +136,7 @@ void main(void)
 	usbhostContext.ep_count = 16;
 	usbhostContext.xfer_count = 2;
 	usbhostContext.iso_xfer_count = 2;
-	usbhost_init(-1, VOS_DEV_USBHOST_2, &usbhostContext);
+	usbhost_init(-1, VOS_DEV_USBHOST, &usbhostContext);
 	/* FTDI:EDI */
 
 	/* FTDI:SCT Thread Creation */
@@ -211,7 +239,7 @@ void open_drivers(void)
 		
 		/* Code for opening and closing drivers - move to required places in Application Threads */
         /* FTDI:SDA Driver Open */
-        hUSBHOST_2 = vos_dev_open(VOS_DEV_USBHOST_2);
+        hUSBHOST = vos_dev_open(VOS_DEV_USBHOST);
         hUART = vos_dev_open(VOS_DEV_UART);
         /* FTDI:EDA */
 		
@@ -249,14 +277,14 @@ void open_drivers(void)
 void attach_drivers(void)
 {
         /* FTDI:SUA Layered Driver Attach Function Calls */
-        hUSBHOST_HID = hid_attach(hUSBHOST_2, VOS_DEV_USBHOST_HID);
+        hUSBHOST_HID = hid_attach(hUSBHOST, VOS_DEV_USBHOST_HID);
         /* FTDI:EUA */
 }
 
 void close_drivers(void)
 {
         /* FTDI:SDB Driver Close */
-        vos_dev_close(hUSBHOST_2);
+        vos_dev_close(hUSBHOST);
         vos_dev_close(hUART);
         /* FTDI:EDB */
 }
@@ -282,8 +310,9 @@ void firmware()
 		{
 			vos_delay_msecs(1000);
 			// wait for enumeration to complete
+			blink();
 			message("USBHOST: Waiting for enumeration\r\n");
-			status = usbhost_connect_state(hUSBHOST_2);
+			status = usbhost_connect_state(hUSBHOST);
 
 		} while (status != PORT_STATE_ENUMERATED);
 
@@ -361,15 +390,7 @@ void firmware()
 					{
 						if (vos_dev_read(hUSBHOST_HID, buf, reportLen, &num_read) == USBHOSTHID_OK)
 						{
-							//Write straight out to the serial
 							vos_dev_write(hUART, (uint8 *) buf, (uint16)num_read, NULL);
-							/*
-							for (byteCount = 0; byteCount < num_read; byteCount++)
-							{
-								number(buf[byteCount]);
-							}
-							message(eol);
-							*/
 						}
 						else
 						{

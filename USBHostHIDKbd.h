@@ -21,17 +21,18 @@
 #include "USBHost.h"
 #include "ioctl.h"
 #include "UART.h"
+#include "GPIO.h"
 #include "stdlib.h"
 #include "USBHID.h"
 #include "USBHostHID.h"
 /* FTDI:EHF */
 
 /* FTDI:SDC Driver Constants */
-#define VOS_DEV_USBHOST_2 0
+#define VOS_DEV_USBHOST 0
 #define VOS_DEV_UART 1
 #define VOS_DEV_USBHOST_HID 2
-
-#define VOS_NUMBER_DEVICES 3
+#define VOS_DEV_GPIO_PORT_A 3
+#define VOS_NUMBER_DEVICES 4
 /* FTDI:EDC */
 
 /* Default settings for UART interface */
@@ -43,5 +44,7 @@
 
 /* FTDI:SXH Externs */
 /* FTDI:EXH */
+
+#define GPIO_MODE_OUTPUT	1
 
 #endif /* _USBHostHIDKbd_H_ */
